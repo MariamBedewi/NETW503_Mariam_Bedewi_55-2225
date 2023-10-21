@@ -1,31 +1,53 @@
 import socket
+import threading
 
-# Create a socket
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# Store client information in a dictionary
+clients = {}
+#key=Client address
+#Value=Client socket objects 
 
-# Bind the socket to a specific address and port
-server_address = ('127.0.0.1', 12345)
-server_socket.bind(server_address)
-
-# Listen for incoming connections
-server_socket.listen(1)
-print("Server is listening for connections...")
-
-while True:
-    # Wait for a connection
-    client_socket, client_address = server_socket.accept()
-    print(f"Connection from {client_address}")
-
+def threaded(client_socket, address):
+    print("[NEW CONNECTION] " + str(address) + " connected.")
+    #as long as the client is connected
     while True:
-        data = client_socket.recv(1024).decode('utf-8')
-        if not data:
-            break
+        
+            #read the data up to 1024 bytes
+            data = client_socket.recv(1024)
+            if not data:
+                print(f"Connection with {address} closed.")
+                #Delete the information of client
+                del clients[address]
+                client_socket.close()
+                break
 
-        if "CLOSE SOCKET" in data:
-            break
+            message = data.decode()
+            print(f"Received from {address}: {message}")
 
-        response = data.upper()
-        client_socket.send(response.encode('utf-8'))
+            if "CLOSE SOCKET" in message:
+                print(f"Closing connection with {address}.")
+                del clients[address]
+                client_socket.close()
+                break
 
-    client_socket.close()
-    print(f"Connection with {client_address} closed")
+            response = message.upper()
+            client_socket.send(response.encode())
+
+        
+
+def main():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 5605))
+    server.listen(5)
+
+    print("Server listening on port 5605...")
+    #Continuously accept incoming client connection
+    while True:
+        client_socket, client_address = server.accept()
+        print(f"Accepted connection from {client_address}")
+        clients[client_address] = client_socket
+
+        new_thread = threading.Thread(target=threaded, args=(client_socket, client_address))
+        new_thread.start()
+
+if __name__ == "__main__":
+    main()
